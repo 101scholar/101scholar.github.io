@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>无名PhD的读书札记</title>
+    <link>https://101scholar.github.io</link>
+    <description>Scholar 101 的个人读书札记</description>
+    <language>zh-cmn-Hans</language>
+
+    <item>
+      <title>在Org-mode中生成多行表格输出</title>
+      <description>在Org-mode中生成多行表格输出</description>
+      <author>Scholar 101</author>
+      <pubDate>Sat, 28 Dec 2024 00:46:55  +0800</pubDate>
+      <link>https://101scholar.github.io/org-table-output.html</link>
+      <guid>https://101scholar.github.io/org-table-output.html</guid>
+    </item>
+    <item>
+      <title>如何用内点法求解二阶锥优化问题</title>
+      <description>如何用内点法求解二阶锥优化问题</description>
+      <author>Scholar 101</author>
+      <pubDate>Fri, 28 Jan 2022 14:35:00  +0800</pubDate>
+      <link>https://101scholar.github.io/soc-ipm-implementation.html</link>
+      <guid>https://101scholar.github.io/soc-ipm-implementation.html</guid>
+    </item>
+  <channel>
+</rss>

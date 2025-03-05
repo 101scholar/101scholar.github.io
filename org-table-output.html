@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="zh-cn-Hans" xml:lang="zh-cn-Hans">
+<head>
+<!-- 2024-12-28 六 00:46 -->
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>在Org-mode中生成多行表格输出</title>
+<meta name="author" content="Scholar 101" />
+<meta name="description" content="这是 Scholar 101 的个人独立博客。" />
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" href="style.css">
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-HV71CP0QWE"></script>
+<script>  window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag("js", new Date()); gtag("config", "G-HV71CP0QWE"); </script>
+</head>
+<body>
+<div id="preamble" class="status">
+
+        <header>
+        <a href="index.html" target="_self"><h1><center>Scholar 101</center></h1></a>
+        </header>
+        <h2><center>在Org-mode中生成多行表格输出</center></h2>
+        <h5>文/第101个书生</h5>
+</div>
+<div id="content" class="content">
+<p>
+Org-mode中默认的表格cell是一行的。当cell中的内容比较多时，一行的视觉效果非常差。这里提供一种实现，利用 <code>fill-region</code> 将cell转成多行。
+</p>
+<div id="outline-container-org8b6aa17" class="outline-2">
+<h2 id="org8b6aa17"><span class="section-number-2">1.</span> 使用</h2>
+<div class="outline-text-2" id="text-1">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="color: #A52A2A; font-weight: bold;">setq</span> records '((<span style="color: #A020F0;">:name</span> <span style="color: #4E9A06;">"ChatGPT"</span> <span style="color: #A020F0;">:description</span> (<span style="color: #4E9A06;">"Created by OpenAI and launched in November 2022."</span> <span style="color: #4E9A06;">"The model can be accessed through OpenAI's website, mobile apps, and API services. It offers both free and premium subscription options through ChatGPT Plus."</span>))
+                (<span style="color: #A020F0;">:name</span> <span style="color: #4E9A06;">"Claude"</span> <span style="color: #A020F0;">:description</span> (<span style="color: #4E9A06;">"Developed by Anthropic using constitutional AI principle"</span> <span style="color: #4E9A06;">"Distinguished by its more direct and nuanced communication style, Claude tends to be more willing to engage in sophisticated discussions and provide detailed, thoughtful responses while maintaining appropriate boundaries."</span> <span style="color: #4E9A06;">"Available through Anthropic's website and API services, Claude has evolved through several versions with improvements in capabilities and performance."</span>))))
+
+(<span style="color: #A52A2A; font-weight: bold;">setq</span> width-list '(10 52))
+
+(<span style="color: #A52A2A; font-weight: bold;">let*</span> ((names (scholar101--get-string-list-from-records
+               records <span style="color: #A020F0;">:name</span> (nth 0 width-list) t))
+       (descs (scholar101--get-string-list-from-records
+               records <span style="color: #A020F0;">:description</span> (nth 1 width-list)))
+       (table-items (scholar101--generate-table
+                     (list <span style="color: #4E9A06;">"name"</span> <span style="color: #4E9A06;">"description"</span>)
+                     (list names descs)
+                     width-list)))
+  (insert (mapconcat 'identity table-items <span style="color: #4E9A06;">"\n"</span>)))
+
+</pre>
+</div>
+
+<p>
+输出效果如下：
+</p>
+<pre class="example" id="orge7e2282">
++------------+------------------------------------------------------+
+| name       | description                                          |
++------------+------------------------------------------------------+
+| ChatGPT    | - Created by OpenAI and launched in November 2022.   |
+|            | - The model can be accessed through OpenAI's         |
+|            |   website, mobile apps, and API services. It offers  |
+|            |   both free and premium subscription options through |
+|            |   ChatGPT Plus.                                      |
++------------+------------------------------------------------------+
+| Claude     | - Developed by Anthropic using constitutional AI     |
+|            |   principle                                          |
+|            | - Distinguished by its more direct and nuanced       |
+|            |   communication style, Claude tends to be more       |
+|            |   willing to engage in sophisticated discussions and |
+|            |   provide detailed, thoughtful responses while       |
+|            |   maintaining appropriate boundaries.                |
+|            | - Available through Anthropic's website and API      |
+|            |   services, Claude has evolved through several       |
+|            |   versions with improvements in capabilities and     |
+|            |   performance.                                       |
++------------+------------------------------------------------------+
+</pre>
+</div>
+</div>
+<div id="outline-container-org4f1ca7f" class="outline-2">
+<h2 id="org4f1ca7f"><span class="section-number-2">2.</span> 代码</h2>
+<div class="outline-text-2" id="text-2">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">(<span style="color: #A52A2A; font-weight: bold;">defun</span> <span style="color: #00578E; font-weight: bold;">scholar101--fill-string-split</span> (string width <span style="color: #2F8B58; font-weight: bold;">&amp;optional</span> no-bullet)
+  <span style="color: #4E9A06;">"Convert single line string to multi-line filled content.</span>
+<span style="color: #4E9A06;">Output is a list of strings. Each string is corresponding line.</span>
+
+<span style="color: #4E9A06;">Param:</span>
+<span style="color: #4E9A06;">    string              : input string without bullet symbol</span>
+<span style="color: #4E9A06;">    width               : width of each line</span>
+<span style="color: #4E9A06;">    no-bullet (optional): whether append bullet symbol in the first line</span>
+
+<span style="color: #4E9A06;">Return:</span>
+<span style="color: #4E9A06;">    List of string</span>
+<span style="color: #4E9A06;">"</span>
+  (<span style="color: #A52A2A; font-weight: bold;">with-temp-buffer</span>
+     (<span style="color: #A52A2A; font-weight: bold;">let</span> ((fill-column (- width 2)))
+       (<span style="color: #A52A2A; font-weight: bold;">when</span> no-bullet
+         (<span style="color: #A52A2A; font-weight: bold;">setq</span> fill-column width))
+       (insert string)
+       <span style="color: #204A87;">;; </span><span style="color: #204A87;">fill content with specific column width</span>
+       (fill-region (point-min) (point-max))
+       (<span style="color: #A52A2A; font-weight: bold;">unless</span> no-bullet
+         (goto-char (point-min))
+         (insert <span style="color: #4E9A06;">"- "</span>)
+         (forward-line 1)
+         (<span style="color: #A52A2A; font-weight: bold;">while</span> (not (eobp))
+           (insert <span style="color: #4E9A06;">"  "</span>)
+           (forward-line 1)))
+       <span style="color: #204A87;">;; </span><span style="color: #204A87;">pad space in the right when necessary</span>
+       (mapcar (<span style="color: #A52A2A; font-weight: bold;">lambda</span> (x)
+                 (format (concat <span style="color: #4E9A06;">"%-"</span> (number-to-string width) <span style="color: #4E9A06;">"s"</span>) x))
+               (split-string (buffer-substring (point-min)
+                                               (point-max))
+                             <span style="color: #4E9A06;">"\n"</span>)))))
+
+(<span style="color: #A52A2A; font-weight: bold;">defun</span> <span style="color: #00578E; font-weight: bold;">scholar101--get-string-list-from-record</span> (record keyword width <span style="color: #2F8B58; font-weight: bold;">&amp;optional</span> no-bullet)
+  <span style="color: #4E9A06;">"Transform the list of strings in record to multi-line string format.</span>
+
+<span style="color: #4E9A06;">Param:</span>
+<span style="color: #4E9A06;">    record : plist, each element has no bullet symbol</span>
+<span style="color: #4E9A06;">    keyword: the name of the list in the plist</span>
+<span style="color: #4E9A06;">    width  : width of each line</span>
+
+<span style="color: #4E9A06;">Return:</span>
+<span style="color: #4E9A06;">    List of string, if input list is empty,</span>
+<span style="color: #4E9A06;">        return one element list containing space.</span>
+<span style="color: #4E9A06;">"</span>
+  (<span style="color: #A52A2A; font-weight: bold;">let</span> ((string-list (plist-get record keyword)))
+    (<span style="color: #A52A2A; font-weight: bold;">unless</span> (listp string-list)
+      (<span style="color: #A52A2A; font-weight: bold;">setq</span> string-list (list string-list)))
+    (<span style="color: #A52A2A; font-weight: bold;">if</span> (length string-list)
+        (apply #'append
+         (mapcar (<span style="color: #A52A2A; font-weight: bold;">lambda</span> (item)
+                   (scholar101--fill-string-split item width no-bullet))
+                 string-list))
+      (list (make-string width ?\ )))))
+
+(<span style="color: #A52A2A; font-weight: bold;">defun</span> <span style="color: #00578E; font-weight: bold;">scholar101--get-string-list-from-records</span> (records keyword width <span style="color: #2F8B58; font-weight: bold;">&amp;optional</span> no-bullet)
+  <span style="color: #4E9A06;">"Each record has a list, and all strings in the list will be formatted as multi-line.</span>
+
+<span style="color: #4E9A06;">Param:</span>
+<span style="color: #4E9A06;">    records: list of plists, each plist contains a list of strings without bullet symbol</span>
+<span style="color: #4E9A06;">    keyword: the name of the list in the plist</span>
+<span style="color: #4E9A06;">    width  : width of each line</span>
+
+<span style="color: #4E9A06;">Return:</span>
+<span style="color: #4E9A06;">    List of string list, each list corresponds to one record.</span>
+<span style="color: #4E9A06;">"</span>
+  (mapcar (<span style="color: #A52A2A; font-weight: bold;">lambda</span> (record)
+            (scholar101--get-string-list-from-record record keyword width no-bullet))
+          records))
+
+(<span style="color: #A52A2A; font-weight: bold;">defun</span> <span style="color: #00578E; font-weight: bold;">scholar101--generate-table</span> (head-list content-list width-list)
+  <span style="color: #4E9A06;">"Generate table head and body, where body is given by</span>
+<span style="color: #4E9A06;">formating CONTENT-LIST according to WIDTH-LIST.</span>
+
+<span style="color: #4E9A06;">Params:</span>
+<span style="color: #4E9A06;">    HEAD-LIST   : a list of head strings, omit head line when setting to nil</span>
+<span style="color: #4E9A06;">    CONTENT-LIST: a list of columns, each column is a list of cells,</span>
+<span style="color: #4E9A06;">                  and each cell is a list of strings.</span>
+<span style="color: #4E9A06;">    WIDTH-LIST  : the width for space-padding each column's short cells.</span>
+
+<span style="color: #4E9A06;">Return:</span>
+<span style="color: #4E9A06;">    list of strings, each element is a line of the table.</span>
+<span style="color: #4E9A06;">"</span>
+  (<span style="color: #A52A2A; font-weight: bold;">let*</span> ((length-column (length content-list))
+         (length-cell (length (car content-list)))
+         (split-line
+          (concat
+           <span style="color: #4E9A06;">"+"</span> (mapconcat #'identity
+                          (mapcar
+                           (<span style="color: #A52A2A; font-weight: bold;">lambda</span> (width)
+                             (concat <span style="color: #4E9A06;">"-"</span> (make-string width ?-) <span style="color: #4E9A06;">"-+"</span>))
+                           width-list)
+                          <span style="color: #4E9A06;">""</span>)))
+         (result '()) head-line)
+    (<span style="color: #A52A2A; font-weight: bold;">when</span> head-list
+      (<span style="color: #A52A2A; font-weight: bold;">setq</span> head-line
+            (concat
+             <span style="color: #4E9A06;">"|"</span> (mapconcat #'identity
+                            (cl-mapcar
+                             (<span style="color: #A52A2A; font-weight: bold;">lambda</span> (head width)
+                               (format (concat <span style="color: #4E9A06;">" %-"</span> (number-to-string width) <span style="color: #4E9A06;">"s |"</span>) head))
+                             head-list width-list)
+                            <span style="color: #4E9A06;">""</span>))))
+    (<span style="color: #A52A2A; font-weight: bold;">dotimes</span> (i length-cell)
+      <span style="color: #204A87;">;; </span><span style="color: #204A87;">Extract the i-th row of cells across all columns</span>
+      (<span style="color: #A52A2A; font-weight: bold;">let</span> ((cell-lists
+             (mapcar (<span style="color: #A52A2A; font-weight: bold;">lambda</span> (col) (nth i col))
+                     content-list)))
+        <span style="color: #204A87;">;; </span><span style="color: #204A87;">Determine max length for this set of sub-lists</span>
+        (<span style="color: #A52A2A; font-weight: bold;">let</span> ((max-len (apply #'max (mapcar #'length cell-lists))))
+          <span style="color: #204A87;">;; </span><span style="color: #204A87;">Augment shorter sub-lists</span>
+          (<span style="color: #A52A2A; font-weight: bold;">setq</span> cell-lists
+                <span style="color: #204A87;">;; </span><span style="color: #204A87;">sublist consists lines of strings in a cell</span>
+                (cl-mapcar (<span style="color: #A52A2A; font-weight: bold;">lambda</span> (sublist width)
+                             (<span style="color: #A52A2A; font-weight: bold;">let</span> ((len (length sublist)))
+                               (<span style="color: #A52A2A; font-weight: bold;">if</span> (&lt; len max-len)
+                                   (append sublist
+                                           (make-list
+                                            (- max-len len)
+                                            (make-string width ? )))
+                                 sublist)))
+                           cell-lists width-list))
+          <span style="color: #204A87;">;; </span><span style="color: #204A87;">Now build each line for this i-th cell</span>
+          (<span style="color: #A52A2A; font-weight: bold;">dotimes</span> (j max-len)
+            (<span style="color: #A52A2A; font-weight: bold;">push</span>
+             (concat <span style="color: #4E9A06;">"|"</span>
+                     (mapconcat
+                      #'identity
+                      (mapcar
+                       (<span style="color: #A52A2A; font-weight: bold;">lambda</span> (col)
+                         (concat <span style="color: #4E9A06;">" "</span> (nth j col) <span style="color: #4E9A06;">" |"</span>))
+                       cell-lists)
+                      <span style="color: #4E9A06;">""</span>))
+             result))
+          <span style="color: #204A87;">;; </span><span style="color: #204A87;">Append an empty line after each cell block</span>
+          (<span style="color: #A52A2A; font-weight: bold;">push</span> split-line result))))
+    (<span style="color: #A52A2A; font-weight: bold;">if</span> head-line
+        (append
+         (list split-line)
+         (list head-line)
+         (list split-line)
+         (nreverse result))
+      (append
+       (list split-line)
+       (nreverse result)))))
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+
+  <div class="content">
+        <section class="meta">
+        <span class="author">
+          <a>发表于</a>
+        </span>
+        <span class="time">
+          <time datetime="2024-12-28 六 00:46">2024-12-28 六 00:46</time>
+        </span>
+        </section>
+  </div>
+  <footer><p><small><center>
+    <a href="http://101scholar.github.io/rss.xml" title="RSS 订阅" target="_blank" >博客 RSS</a>
+  </center></small></p></footer>
+</div>
+</body>
+</html>

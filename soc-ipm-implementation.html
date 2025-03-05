@@ -1,0 +1,569 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="zh-cn-Hans" xml:lang="zh-cn-Hans">
+<head>
+<!-- 2024-02-01 四 02:01 -->
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>如何用内点法求解二阶锥优化问题</title>
+<meta name="author" content="Scholar 101" />
+<meta name="description" content="这是 Scholar 101 的个人读书札记。" />
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" href="style.css">
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-HV71CP0QWE"></script>
+<script>  window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag("js", new Date()); gtag("config", "G-HV71CP0QWE"); </script>
+<script>
+  window.MathJax = {
+    tex: {
+      ams: {
+        multlineWidth: '85%'
+      },
+      tags: 'ams',
+      tagSide: 'right',
+      tagIndent: '.8em'
+    },
+    chtml: {
+      scale: 1.0,
+      displayAlign: 'center',
+      displayIndent: '0em'
+    },
+    svg: {
+      scale: 1.0,
+      displayAlign: 'center',
+      displayIndent: '0em'
+    },
+    output: {
+      font: 'mathjax-modern',
+      displayOverflow: 'overflow'
+    }
+  };
+</script>
+
+<script
+  id="MathJax-script"
+  async
+  src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS_SVG">
+</script>
+</head>
+<body>
+<div id="preamble" class="status">
+
+        <header>
+        <a href="index.html" target="_self"><h1><center>读书札记</center></h1></a>
+        </header>
+        <h2><center>如何用内点法求解二阶锥优化问题</center></h2>
+        <h5>文/第101个书生</h5>
+</div>
+<div id="content" class="content">
+<p>
+前段时间因为相关项目，读了一些内点法解二阶锥优化的文章和代码。现在空出时间，就把这些整理一下，同时也作为一篇内点法应用在二阶锥优化的科普文。
+</p>
+
+<div id="outline-container-org61070ef" class="outline-2">
+<h2 id="org61070ef"><span class="section-number-2">1.</span> 优化问题描述</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+对向量 \(\boldsymbol{y} = \begin{pmatrix} y_0 \\ \boldsymbol{y_1}\end{pmatrix}\) 而言，所谓二阶锥约束 \(\boldsymbol{y} \in \text{SOC}\) 指的是 \(y_0 \ge \|\boldsymbol{y_1}\|_2\)。而二阶锥优化指的是目标函数为线性，约束由线性约束和二阶锥约束组成的优化问题。因此，任何二阶锥优化问题都可以写成如下的形式：
+</p>
+\begin{align*}
+\min_x &\quad c^{\intercal} x \\
+\text{s.t.} &\quad Ax = b \\
+&\quad Gx \preceq h
+\end{align*}
+<p>
+其中，
+\[ G = \begin{pmatrix} G_0 \\ G_1 \\ \vdots \\ G_q \end{pmatrix}, h = \begin{pmatrix} h_0 \\ h_1 \\ \vdots \\ h_q \end{pmatrix} \]
+而 \(Gx \preceq h\) 表示
+</p>
+\begin{align*}
+G_0 x &\le h_0, \\
+h_i - G_i x &\in \text{SOC}, &i = 1, 2, \cdots, q.
+\end{align*}
+<p>
+这里数据的大小为 \(A\in\mathbb{R}^{m\times n}, G_i\in\mathbb{R}^{p_i\times n}\)。\(Gx\preceq h\) 对应的锥的 degree 为 \(d = p_0 + q\)。
+</p>
+
+<p>
+通过加入松弛变量 \(s\)，该问题可以改写为如下的原始问题（primal）
+</p>
+\begin{align*}
+\min_{x, s} &\quad c^{\intercal} x \\
+\text{s.t.} &\quad Ax = b \\
+&\quad Gx + s = h \\
+&\quad s \succeq 0
+\end{align*}
+<p>
+相应的对偶问题（dual）为
+</p>
+\begin{align*}
+\max_{y, z} &\quad -b^{\intercal} y - h^\intercal z \\
+\text{s.t.} &\quad A^\intercal y + G^\intercal z + c = 0 \\
+&\quad z \succeq 0
+\end{align*}
+</div>
+</div>
+<div id="outline-container-org0718f67" class="outline-2">
+<h2 id="org0718f67"><span class="section-number-2">2.</span> 内点法的求解套路</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+内点法本质上就是从一组可行解 \((x_k, y_k, s_k, z_k)\) 出发，反复计算牛顿法方向 \((\Delta x_k, \Delta y_k, \Delta s_k, \Delta z_k)\) 以及一个合适的步长 \(\alpha_k\)，进行更新：
+\[ (x_{k+1}, y_{k+1}, s_{k+1}, z_{k+1}) = (x_k, y_k, s_k, z_k) + \alpha_k (\Delta x_k, \Delta y_k, \Delta s_k, \Delta z_k)\]
+</p>
+
+<p>
+为此我们需要首先找到一组原始-对偶可行解。而判断原始问题和对偶问题的可行性，一般需要求解一个辅助问题。为了省去求解这样一个额外优化问题的麻烦，可以利用二阶锥的自对偶性质。
+</p>
+</div>
+<div id="outline-container-org2480242" class="outline-3">
+<h3 id="org2480242"><span class="section-number-3">2.1.</span> 将问题改写为 Homogeneous self dual 的形式</h3>
+<div class="outline-text-3" id="text-2-1">
+<p>
+具体而言，假设我们拥有一组满足 \(s_0 \succ 0, z_0 \succ 0\) 的初始解 \((x_0, y_0, s_0, z_0)\)，令
+\[\begin{bmatrix}
+\bar{c} \\ \bar{b} \\ \bar{h} \\ \bar{\tau}
+\end{bmatrix}
+= \frac{d+1}{s_0^\intercal z_0 + 1}
+\left(\begin{bmatrix}
+0\\0\\s_0\\1
+\end{bmatrix} - \begin{bmatrix}
+0 & A^{\intercal} &G^\intercal &c\\
+-A &0 &0 &b\\
+-G &0 &0 &h\\
+-c^\intercal &-b^\intercal &-h^\intercal &0 \\
+\end{bmatrix} \begin{bmatrix}
+x_0 \\ y_0 \\ z_0 \\ 1
+\end{bmatrix}
+\right)
+\]
+考虑如下优化问题（HSD）：
+</p>
+\begin{align*}
+\min_{x, s, y, z, \kappa, \tau, \theta} &(d + 1) \theta \\
+\text{s.t.} & \begin{bmatrix}
+0 & A^{\intercal} &G^\intercal &c &\bar{c}\\
+-A &0 &0 &b &\bar{b}\\
+-G &0 &0 &h &\bar{h}\\
+-c^\intercal &-b^\intercal &-h^\intercal &0 &\bar{\tau} \\
+-\bar{c}^\intercal & -\bar{b}^\intercal &-\bar{h}^\intercal & -\bar{\tau} &0
+\end{bmatrix}
+\begin{bmatrix}
+x \\ y \\ z \\ \tau \\ \theta
+\end{bmatrix}
+= \begin{bmatrix}
+0 \\ 0 \\ s \\ \kappa \\ -(d + 1)
+\end{bmatrix} \\
+&(s, \kappa, z, \tau) \succeq 0
+\end{align*}
+<p>
+该优化问题满足如下性质：
+</p>
+<ul class="org-ul">
+<li>最优值为 0，最优解的集合是有界的</li>
+<li>若最优解 \(\tau^{ * } > 0\)，那么 \(\kappa^{ * } = 0\)，\((\frac{x^{ * }}{\tau^{ * }}, \frac{y^{ * }}{\tau^{ * }}, \frac{s^{ * }}{\tau^{ * }}, \frac{z^{ * }}{\tau^{ * }})\) 是原问题和对偶问题的一组最优解</li>
+<li>若最优解 \(\tau^{ * } = 0\) 且 \(h^\intercal z^{ * } + b^\intercal y^{ * } < 0\)，\((y^{ * }, z^{ * })\) 是原始问题不可行的 certificate</li>
+<li>若最优解 \(\tau^{ * } = 0\) 且 \(c^\intercal x^{ * } < 0\)，\((x^{ * }, s^{ * })\) 是对偶问题不可行的 certificate</li>
+<li>否则，必有 \(\tau^{ * } = c^\intercal x^{ * } = h^\intercal z^{ * } + b^\intercal y^{ * } = \kappa^{ * } = 0\)。不知是算法必然不会收敛到这样的情形，还是这种情形算法无法处理，查阅的文献和开源代码都没有做说明</li>
+</ul>
+
+<p>
+为方便记忆，可以这样理解上面的 HSD 问题：
+</p>
+<ol class="org-ol">
+<li>首先忽略约束的最后一行和最后一列，那么第 2、3 行对应于原始问题约束、第 1 行对偶问题约束、第 4 行对偶间隙为 0 的最优性条件。这一点通过让 \(\tau = 1, \kappa = 0\) 可以发现。</li>
+<li>构造这样一组初始的 \(s_0, z_0\)：\(\mathbb{R}^+\) 部分全部赋为 1，二阶锥部分第一个元素赋为 1 其余为 0，以及任意的 \(x_0, y_0\)（本质上对应 \(\mu = 1\) 的中心路径）。将初始解代入，令 \(\tau_0 = \kappa_0 = \theta_0 = 1\)，同时为满足约束，添加 \(\bar{c}, \bar{h}, \bar{z}, \bar{\tau}\) 为各约束的残差项。最后一个约束的右端项设为 \(-(s_0^\intercal z_0 + \kappa_0 \tau_0)\)。最后为保证自对偶成立，目标函数设为相同的值。</li>
+<li>考虑更一般的初始值 \(s_0 \succ 0, z_0 \succ 0\)。为保证约束成立，保持约束右端项不变，前四项约束把系数 \(\bar{c}, \bar{b}, \bar{h}, \bar{\tau}\) 用 \(\frac{d+1}{s_0^\intercal z_0 + 1}\) 进行 scale，最后一项约束 把 \(\theta_0\) scale 为 \(\frac{s_0^\intercal z_0 + 1}{d+1}\)。</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-org2e480ba" class="outline-3">
+<h3 id="org2e480ba"><span class="section-number-3">2.2.</span> 基于 Homogeneous self dual 的中心路径</h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+HSD 问题的最优性条件为
+</p>
+\begin{align*}
+\begin{bmatrix}
+0 & A^{\intercal} &G^\intercal &c &\bar{c}\\
+-A &0 &0 &b &\bar{b}\\
+-G &0 &0 &h &\bar{h}\\
+-c^\intercal &-b^\intercal &-h^\intercal &0 &\bar{\tau} \\
+-\bar{c}^\intercal & -\bar{b}^\intercal &-\bar{h}^\intercal & -\bar{\tau} &0
+\end{bmatrix}
+\begin{bmatrix}
+x \\ y \\ z \\ \tau \\ \theta
+\end{bmatrix}
+&= \begin{bmatrix}
+0 \\ 0 \\ s \\ \kappa \\ -(d + 1)
+\end{bmatrix} \\
+s^\intercal z = 0,& \kappa \cdot \tau = 0 \\
+(s, \kappa, z, \tau) &\succeq 0
+\end{align*}
+
+<p>
+定义锥内积符号 \(\circ\)：
+</p>
+<ul class="org-ul">
+<li>若 \(s_i \in \mathbb{R}_+^p, z \in \mathbb{R}_+^{p}\) 那么 \(s \circ z\) 表示对应元素相乘；</li>
+<li>若 \(s_i = \begin{bmatrix}s_0 \\ \boldsymbol{s_1}\end{bmatrix} \in \text{SOC}, z_i = \begin{bmatrix}z_0 \\ \boldsymbol{z_1}\end{bmatrix} \in \text{SOC}\) 那么 \(s \circ z = \begin{bmatrix}s^\intercal z \\ s_0 \boldsymbol{z}_1 + z_0 \boldsymbol{s}_1\end{bmatrix}\)</li>
+</ul>
+
+<p>
+给定 \(\mu\)，将互补松弛约束换成 \(s \circ z = \mu \cdot \boldsymbol{e}, \kappa \cdot \tau = \mu\)（具体推导见 barrier 函数求导为零）。这里 \(\boldsymbol{e}\) 的维数和 \(s, z\) 相同，对应 \(s_0\) 的部分 \(\boldsymbol{e}_0 = (1, \dots, 1)^\intercal\)；对应 \(s_i \in \text{SOC}\) 的部分 \(\boldsymbol{e}_i = (1, 0, \dots, 0)^\intercal\)。
+</p>
+
+<p>
+下面我们将解出 \(\theta\) 的值。首先根据 \(s\circ z = \mu \boldsymbol{e}\) 可知 \(s^\intercal z = \mu\)。故而 \(\mu = \frac{s^\intercal z + \kappa \tau}{d + 1}\)。将 \((x^\intercal, y^\intercal, z^\intercal, \tau, \theta)\) 与等式约束两边内积，可知 \(\theta = \mu\)。将 \((x^\intercal, y^\intercal, z^\intercal, \tau)\) 与等式约束前h四行两边内积可知，当 \(\mu \neq 0\) 时，最后一行约束是冗余的。精简后我们的方程组将变成：
+</p>
+\begin{align*}
+\begin{bmatrix}
+0 & A^{\intercal} &G^\intercal &c\\
+-A &0 &0 &b\\
+-G &0 &0 &h\\
+-c^\intercal &-b^\intercal &-h^\intercal &0
+\end{bmatrix}
+\begin{bmatrix}
+x \\ y \\ z \\ \tau
+\end{bmatrix} + \mu \begin{bmatrix}
+\bar{c} \\ \bar{b} \\ \bar{h} \\ \bar{\tau}
+\end{bmatrix}
+&= \begin{bmatrix}
+0 \\ 0 \\ s \\ \kappa
+\end{bmatrix} \\
+s \circ z &= \mu \boldsymbol{e}\\
+\kappa \cdot \tau &= \mu \\
+(s, \kappa, z, \tau) &\succ 0
+\end{align*}
+<p>
+该方程组唯一确定了一组 \((x, y, s, z, \tau, \kappa)\)，这组解对应着中心路径上参数为 \(\mu\) 的点。
+</p>
+</div>
+</div>
+<div id="outline-container-orgad6c2ce" class="outline-3">
+<h3 id="orgad6c2ce"><span class="section-number-3">2.3.</span> 中心路径的近似求解</h3>
+<div class="outline-text-3" id="text-2-3">
+<p>
+每次迭代中，给定 \(\mu\)，我们将通过一步牛顿法近似求解上面的非线性系统。在不同迭代中逐渐缩小 \(\mu \gets \sigma \cdot \mu\) 的值，算法将收敛到问题的最优解。
+</p>
+
+<p>
+具体而言，第 \(k\) 次迭代，令 \(\mu_k = \frac{s_k^\intercal z_k + \tau_k \kappa_k}{d+1}, \mu = \sigma \cdot \mu_k\)，我们希望求解以下系统，得到 \((\Delta x, \Delta y, \Delta s, \Delta z, \Delta \tau, \Delta \kappa)\)：
+</p>
+\begin{align*}
+\begin{bmatrix}
+0 & A^{\intercal} &G^\intercal &c &\bar{c}\\
+-A &0 &0 &b &\bar{b}\\
+-G &0 &0 &h &\bar{h}\\
+-c^\intercal &-b^\intercal &-h^\intercal &0 &\bar{\tau}
+\end{bmatrix}
+\begin{bmatrix}
+x_k + \Delta x_k \\ y_k + \Delta y_k \\ z_k + \Delta z_k \\ \tau_k + \Delta \tau_k
+\end{bmatrix} + \sigma \mu_k \begin{bmatrix}
+\bar{c} \\ \bar{b} \\ \bar{h} \\ \bar{\tau}
+\end{bmatrix}
+&= \begin{bmatrix}
+0 \\ 0 \\ s_k + \Delta s_k \\ \kappa_k + \Delta \kappa_k
+\end{bmatrix} \\
+(s_k + \Delta s_k) \circ (z_k + \Delta z_k) &= \sigma \mu_k \boldsymbol{e}\\
+(\kappa_{k}+\Delta\kappa_k) \cdot (\tau_{k}+\Delta\tau_k) &= \sigma \mu_k \\
+\end{align*}
+<p>
+我们将通过一步牛顿法近似求解上面的非线性系统，即把上面的系统线性化，然后求解相应的线性系统。此时，如果 \(s_k, z_k\) 过于靠近锥的边缘，那么更新的步长就会受限，从而影响迭代算法的收敛速度。常见的处理方式是构造 scaling 矩阵 \(W\) 使得
+</p>
+\begin{align*}
+s \succeq 0 &\Leftrightarrow W^{-\intercal}s \succeq 0\\
+z \succeq 0 &\Leftrightarrow Wz \succeq 0\\
+s \circ z = \mu\boldsymbol{e} &\Leftrightarrow W^{-\intercal}s \circ Wz = \mu\boldsymbol{e}
+\end{align*}
+<p>
+构造满足 \(W^{-\intercal}s = Wz\) 的 \(W\)，我们得以居中原本的 \(s\) 和 \(z\)，从而使得步长不那么保守。将最后两行非线性约束中的 \(s, z\) 换成上述居中后的变量，显然中心路径的解仍然保持不变，但线性化求出的近似解离锥的边界更远。这里 \(W\) 矩阵的一个常用选择是 Nesterov-Todd scaling 矩阵。记由 NT 方法从 \(s_k, z_k\) 得到的矩阵为 \(W_k\)，我们需要近似求解的系统可以进一步写为：
+</p>
+\begin{align*}
+\begin{bmatrix}
+0 & A^{\intercal} &G^\intercal &c &\bar{c}\\
+-A &0 &0 &b &\bar{b}\\
+-G &0 &0 &h &\bar{h}\\
+-c^\intercal &-b^\intercal &-h^\intercal &0 &\bar{\tau}
+\end{bmatrix}
+\begin{bmatrix}
+x_k + \Delta x_k \\ y_k + \Delta y_k \\ z_k + \Delta z_k \\ \tau_k + \Delta \tau_k
+\end{bmatrix} + \sigma \mu_k \begin{bmatrix}
+\bar{c} \\ \bar{b} \\ \bar{h} \\ \bar{\tau}
+\end{bmatrix}
+&= \begin{bmatrix}
+0 \\ 0 \\ s_k + \Delta s_k \\ \kappa_k + \Delta \kappa_k
+\end{bmatrix} \\
+W_k^{-\intercal}(s_k + \Delta s_k) \circ W_k(z_k + \Delta z_k) &= \sigma \mu_k \boldsymbol{e}\\
+(\kappa_{k}+\Delta\kappa_k) \cdot (\tau_{k}+\Delta\tau_k) &= \sigma \mu_k \\
+\end{align*}
+<p>
+通过对最后两个非线性方程做线性近似，我们就能近似求解出更新方向。即扔掉 \(\Delta s_k \circ \Delta z_k\) 和 \(\Delta \kappa_k \cdot \Delta \tau_k\) 两项，求解相应的线性系统。
+</p>
+
+<p>
+至此，给定初始点之后，只要确定出每次 \(\mu\) 缩小的系数 \(\sigma\) 和每次迭代的步长 \(\alpha_k\)，我们就能使用内点法进行求解了。
+</p>
+</div>
+</div>
+<div id="outline-container-org1fb512c" class="outline-3">
+<h3 id="org1fb512c"><span class="section-number-3">2.4.</span> \(\sigma\) 和 \(\alpha_k\) 的选取</h3>
+<div class="outline-text-3" id="text-2-4">
+<p>
+类似线性规划中的内点法，考虑 \(\sigma \in (0, 1)\)。当 \(\sigma \to 0_{+}\) 时，该迭代的主要作用是降低整体的 duality gap；而当 \(\sigma \to 1_{-}\) 时，该迭代的主要作用是在不改变整体 duality gap 的情况下把解尽量往锥的内部推，这样一来原来边界的下一次迭代就能走出更大的步长。
+</p>
+
+<p>
+在线性规划中 \(\sigma\) 和 \(\alpha_k\) 有三种常见的选取方式，其中两种是短步长方案和长步长方案。短步长方案理论收敛速度更快，但实际运行效果长步长在很多情况下都更快收敛。为了兼备二者的优势，有人提出一种 predictor-corrector 的步长选取方案。这里我们将这种方案运用到锥优化里。
+</p>
+
+<ol class="org-ol">
+<li>Affine 步：\(\sigma = 0\)，首先将目标聚焦在下降 duality gap 上，根据等式系统得到步长。沿着该步长方向尽可能走直到锥约束的边界，此时的变量值记为 \((x_a, y_a, s_a, z_a, \tau_a, \kappa_a)\)，计算走完之后的 \(\mu_a = \frac{s_a^\intercal z_a + \tau_a \kappa_a}{d+1}\)。</li>
+<li>Center 步：接着 \(\sigma = (\frac{\mu_a}{\mu_k})^3\)，将目标聚焦在靠近中心路径上，走一步。</li>
+<li>将上面两步合成一步，作为更新的方向。更新的步长选择走到锥边界上的最大步长 * 0.99。即尽可能走最远，同时为了防止数值问题，乘上一个接近 1 的小数。</li>
+</ol>
+
+<p>
+具体而言，首先线性化下面的式子（即扔掉 \(\Delta s_a \circ \Delta z_a\) 和 \(\Delta\kappa_a \cdot \Delta \tau_a\)）计算出第一步的更新方向 \((\Delta x_a, \Delta y_a, \Delta s_a, \Delta z_a, \Delta \tau_a, \Delta \kappa_a)\):
+</p>
+\begin{align*}
+\begin{bmatrix}
+0 & A^{\intercal} &G^\intercal &c &\bar{c}\\
+-A &0 &0 &b &\bar{b}\\
+-G &0 &0 &h &\bar{h}\\
+-c^\intercal &-b^\intercal &-h^\intercal &0 &\bar{\tau}
+\end{bmatrix}
+\begin{bmatrix}
+x_k + \Delta x_a \\ y_k + \Delta y_a \\ z_k + \Delta z_a \\ \tau_k + \Delta \tau_a
+\end{bmatrix}
+&= \begin{bmatrix}
+0 \\ 0 \\ s_k + \Delta s_a \\ \kappa_k + \Delta \kappa_a
+\end{bmatrix} \\
+W_k^{-\intercal}(s_k + \Delta s_a) \circ W_k(z_k + \Delta z_a) &= 0\\
+(\kappa_{k}+\Delta\kappa_a) \cdot (\tau_{k}+\Delta\tau_a) &= 0 \\
+\end{align*}
+<p>
+并计算出步长
+</p>
+\begin{align*}
+\alpha_a &= \sup\{ 0 \le \alpha \le 1: (s_k, z_k, \tau_k, \kappa_k) + \alpha (\Delta s_a, \Delta z_a, \Delta \tau_a, \Delta \kappa_a) \succeq 0\}\\
+&= \sup\{ 0 \le \alpha \le 1: (W_k^{-\intercal}s_k, W_k z_k, \tau_k, \kappa_k) + \alpha (W_k^{-\intercal}\Delta s_a, W_k \Delta z_a, \Delta \tau_a, \Delta \kappa_a) \succeq 0\}
+\end{align*}
+
+<p>
+通过一部分运算可以得到，\(\sigma = (\frac{\mu_a}{\mu_k})^3 = (1-\alpha_a)^3\)。接着线性化下面的式子计算出第二步的更新方向 \((\Delta x_c, \Delta y_c, \Delta s_c, \Delta z_c, \Delta \tau_c, \Delta \kappa_c)\):
+</p>
+\begin{align*}
+\begin{bmatrix}
+0 & A^{\intercal} &G^\intercal &c &\bar{c}\\
+-A &0 &0 &b &\bar{b}\\
+-G &0 &0 &h &\bar{h}\\
+-c^\intercal &-b^\intercal &-h^\intercal &0 &\bar{\tau}
+\end{bmatrix}
+\begin{bmatrix}
+x_k + \Delta x_a + \Delta x_c \\ y_k + \Delta y_a + \Delta y_c \\ z_k + \Delta z_a + \Delta z_c \\ \tau_k + \Delta \tau_a + \Delta \tau_c
+\end{bmatrix} + \sigma \mu_k \begin{bmatrix}
+\bar{c} \\ \bar{b} \\ \bar{h} \\ \bar{\tau}
+\end{bmatrix}
+&= \begin{bmatrix}
+0 \\ 0 \\ s_k + \Delta s_a + \Delta s_c \\ \kappa_k + \Delta \kappa_a + \Delta \kappa_c
+\end{bmatrix} \\
+W_k^{-\intercal}(s_k + \Delta s_a + \Delta s_c) \circ W_k(z_k + \Delta z_a + \Delta z_c) &= \sigma \mu_k \boldsymbol{e}\\
+(\kappa_{k}+\Delta\kappa_a+\Delta\kappa_c) \cdot (\tau_{k}+\Delta\tau_a+\Delta\tau_c) &= \sigma \mu_k \\
+\end{align*}
+<p>
+在线性化的时候扔掉所有 \(\Delta\) 项的乘积，但为了弥补部分上一步线性化的误差，保留 \(\Delta s_a \circ \Delta z_a\) 和 \(\Delta\kappa_a \cdot \Delta \tau_a\)，即最后两个等式近似为：
+</p>
+\begin{align*}
+W_k^{-\intercal}(s_k + \Delta s_a) \circ W_k(z_k + \Delta z_a) + W_k^{-\intercal}s_k \circ W_k \Delta z_c + W_k^{-\intercal}\Delta s_c \circ W_kz_k &= \sigma \mu_k \boldsymbol{e}\\
+(\kappa_{k}+\Delta\kappa_a) \cdot (\tau_{k}+\Delta\tau_a) + \kappa_{k} \cdot \Delta\tau_c + \Delta\kappa_c \cdot \tau_{k} &= \sigma \mu_k \\
+\end{align*}
+
+<p>
+最后，迭代的方向为
+\[
+(\Delta x, \Delta y, \Delta s, \Delta z, \Delta \tau, \Delta \kappa) =
+(\Delta x_a, \Delta y_a, \Delta s_a, \Delta z_a, \Delta \tau_a, \Delta \kappa_a)+
+(\Delta x_c, \Delta y_c, \Delta s_c, \Delta z_c, \Delta \tau_c, \Delta \kappa_c)
+\]
+迭代的步长为
+\[
+\alpha = \sup\{ 0 \le \alpha \le 1: (W_k^{-\intercal}s_k, W_k z_k, \tau_k, \kappa_k) + \frac{\alpha}{0.99} (W_k^{-\intercal}\Delta s, W_k \Delta z, \Delta \tau, \Delta \kappa) \succeq 0\}
+\]
+</p>
+
+<p>
+至此内点法的迭代就介绍完了，下面将通过一些变量间的关系梳理并简化上面的表达。
+</p>
+</div>
+</div>
+<div id="outline-container-orga6ba64d" class="outline-3">
+<h3 id="orga6ba64d"><span class="section-number-3">2.5.</span> 化简与整理</h3>
+<div class="outline-text-3" id="text-2-5">
+<p>
+首先引入符号 \(\lambda_k := W_k^{-\intercal}s_k = W_k z_k\) 以及残差项
+\[\begin{bmatrix}
+r_{x, k} \\ r_{y, k} \\ r_{z, k} \\ r_{\tau, k}
+\end{bmatrix}
+= \begin{bmatrix}
+0 \\ 0 \\ s_k \\ \kappa_k
+\end{bmatrix} - \begin{bmatrix}
+0 & A^{\intercal} &G^\intercal &c\\
+-A &0 &0 &b\\
+-G &0 &0 &h\\
+-c^\intercal &-b^\intercal &-h^\intercal &0
+\end{bmatrix} \begin{bmatrix}
+x_k \\ y_k \\ z_k \\ \tau_k
+\end{bmatrix} \]
+第一步的线性方程即
+</p>
+\begin{align*}
+\begin{bmatrix}
+0 & A^{\intercal} &G^\intercal &c &\bar{c}\\
+-A &0 &0 &b &\bar{b}\\
+-G &0 &0 &h &\bar{h}\\
+-c^\intercal &-b^\intercal &-h^\intercal &0 &\bar{\tau}
+\end{bmatrix}
+\begin{bmatrix}
+\Delta x_a \\ \Delta y_a \\ \Delta z_a \\ \Delta \tau_a
+\end{bmatrix}
+&= \begin{bmatrix}
+0 \\ 0 \\ \Delta s_a \\ \Delta \kappa_a
+\end{bmatrix} + \begin{bmatrix}
+r_{x, k} \\ r_{y, k} \\ r_{z, k} \\ r_{\tau, k}
+\end{bmatrix} \\
+\lambda \circ (W_k^{-\intercal} \Delta s_a + W_k \Delta z_a) &= -\lambda_k \circ \lambda_k\\
+\kappa_k \Delta \tau_a + \Delta\kappa_a \tau_k &= -\kappa_k \cdot \tau_k
+\end{align*}
+<p>
+接着，第二步不计算 center 方向，而是直接计算 affine 和 center 合并后的步长。同时注意到(见 Sec 7.2 <a href="#citeproc_bib_item_1">Vandenberghe, n.d.</a>)
+\[\begin{bmatrix}
+r_{x, k} \\ r_{y, k} \\ r_{z, k} \\ r_{\tau, k}
+\end{bmatrix}
+= \mu_k \begin{bmatrix}
+\bar{c} \\ \bar{b} \\ \bar{h} \\ \bar{\tau}
+\end{bmatrix}\]
+故而整体的更新方向可由如下线性系统得到：
+</p>
+\begin{align*}
+\begin{bmatrix}
+0 & A^{\intercal} &G^\intercal &c &\bar{c}\\
+-A &0 &0 &b &\bar{b}\\
+-G &0 &0 &h &\bar{h}\\
+-c^\intercal &-b^\intercal &-h^\intercal &0 &\bar{\tau}
+\end{bmatrix}
+\begin{bmatrix}
+\Delta x \\ \Delta y \\ \Delta z \\ \Delta \tau
+\end{bmatrix}
+&= \begin{bmatrix}
+0 \\ 0 \\ \Delta s \\ \Delta \kappa
+\end{bmatrix} + (1-\sigma)\begin{bmatrix}
+r_{x, k} \\ r_{y, k} \\ r_{z, k} \\ r_{\tau, k}
+\end{bmatrix} \\
+\lambda \circ (W_k^{-\intercal} \Delta s + W_k \Delta z) &= -\lambda_k \circ \lambda_k - W_k^{-\intercal} \Delta s_a \circ W_k \Delta z_a + \sigma\mu_k \boldsymbol{e}\\
+\kappa_k \Delta \tau + \Delta\kappa \tau_k &= -\kappa_k \cdot \tau_k - \Delta \tau_a \cdot \Delta\kappa_a + \sigma \mu_k
+\end{align*}
+</div>
+</div>
+<div id="outline-container-orgfa400a6" class="outline-3">
+<h3 id="orgfa400a6"><span class="section-number-3">2.6.</span> 终止条件</h3>
+<div class="outline-text-3" id="text-2-6">
+<p>
+由于迭代会收敛到 HSD 问题的最优解，故而理论上的终止条件为原始问题到达最优、原始问题不可行、对偶问题不可行三者之一。
+</p>
+
+<p>
+具体而言，最优的判定条件为
+</p>
+\begin{align*}
+\frac{\|Gx + s - h\|_2}{\max\{\|h\|_2, 1\}} \le \epsilon_{feas},
+\frac{\|Ax - b\|_2}{\max\{\|b\|_2, 1\}} \le \epsilon_{feas},
+\frac{\|G^\intercal z + A^\intercal y + c\|_2}{\max\{\|c\|_2, 1\}} \le \epsilon_{feas} \\
+s^\intercal z \le \epsilon_{abs} \text{ or } \left( \rho := \min\{c^\intercal x, + b^\intercal y\} < 0 \text{ and } \frac{s^\intercal z}{-\rho} \le \epsilon_{rel} \right)
+\end{align*}
+<p>
+第一行的三个条件用来判断原始与对偶问题的可行性，由于迭代过程中 \(s, z\) 始终满足锥约束，故不需要额外判定。第二行的约束对应互补松弛条件，其中第二个条件是为了应对目标函数值过大，导致即便互补松弛条件还未达到但解已几乎是最优的情况。
+</p>
+
+<p>
+原始不可行的条件为
+</p>
+\begin{align*}
+\frac{\|A^\intercal y + G^\intercal z\|_2}{\max\{\|c\|_2, 1\}} &\le \epsilon_{feas}\\
+h^\intercal z + b^\intercal y &< 0
+\end{align*}
+<p>
+对偶不可行的条件为
+</p>
+\begin{align*}
+\frac{\|G^\intercal x + s\|_2}{\max\{\|h\|_2, 1\}} &\le \epsilon_{feas}\\
+\frac{\|A x\|_2}{\max\{\|b\|_2, 1\}} &\le \epsilon_{feas}\\
+c^\intercal x &< 0
+\end{align*}
+<p>
+根据开源求解器提供的代码来看，不可行的实际判定方法每家都有所差异。如 <a href="https://github.com/cvxopt/cvxopt/blob/d5a21cf1da62e4269176384b1ff62edac5579f94/src/python/coneprog.py#L976">cvxopt</a> 的代码中直接去掉了 \(h^\intercal z + b^\intercal y < 0\) 和 \(c^\intercal x < 0\) 的判断；<a href="https://github.com/embotech/ecos/blob/5d3aa62ef437e41c0314b4a16427d5d06a90b7e6/src/ecos.c#L217">ecos</a> 的代码在去掉上述判断的同时增加了 \(\tau < \kappa\) 的判断。
+</p>
+</div>
+</div>
+<div id="outline-container-orgaad51a6" class="outline-3">
+<h3 id="orgaad51a6"><span class="section-number-3">2.7.</span> 初始点的选取</h3>
+<div class="outline-text-3" id="text-2-7">
+<p>
+一个非常简单的选择是 \(x_0 = 0, y_0 = 0, \kappa_0 = \tau_0 = 1, s_0 = z_0 = \boldsymbol{e}\)。这个初始点对应着中心路径上 \(\mu = 1\) 的点。
+</p>
+
+<p>
+上面这种初始化方式完全没有用到数据信息，为了利用上系数矩阵的信息，将下面两个最小二乘问题的解作为初始解：
+</p>
+\begin{align*}
+\min_x &\quad \|s\|_2^2 \\
+\text{s.t.} &\quad Ax = b \\
+&\quad Gx + s = h
+\end{align*}
+<p>
+以及
+</p>
+\begin{align*}
+\min_x &\quad \|z\|_2^2 \\
+\text{s.t.} &\quad A^\intercal y + G^\intercal z + c = 0
+\end{align*}
+<p>
+如果不满足锥约束，就加上简单选择中的 \(s_0, z_0\) 直到满足。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-orgedd01ab" class="outline-2">
+<h2 id="orgedd01ab"><span class="section-number-2">3.</span> 后记</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+至此内点法的求解方式就介绍完了，但 \(\tau^{ * } = c^\intercal x^{ * } = h^\intercal z^{ * } + b^\intercal y^{ * } = \kappa^{ * } = 0\) 的情形是否会遇到以及如何处理，笔者仍没有答案。在实际求解中，我们可以视作在规定迭代数内未求解出结果，然后换个初始点再解一遍。当然，如果有读者了解，欢迎通过邮箱与我交流。
+</p>
+</div>
+</div>
+<div id="outline-container-orgae2ad92" class="outline-2">
+<h2 id="orgae2ad92"><span class="section-number-2">4.</span> 参考文献</h2>
+<div class="outline-text-2" id="text-4">
+<style>.csl-entry{text-indent: -1.5em; margin-left: 1.5em;}</style><div class="csl-bib-body">
+  <div class="csl-entry"><a id="citeproc_bib_item_1"></a>Vandenberghe, L. n.d. “The CVXOPT linear and quadratic cone program solvers.”</div>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+
+  <div class="content">
+        <section class="meta">
+        <span class="author">
+          <a>发表于</a>
+        </span>
+        <span class="time">
+          <time datetime="2022-01-28 五 14:35">2022-01-28 五 14:35</time>
+        </span>
+        </section>
+  </div>
+  <footer><p><small><center>
+    <a href="http://101scholar.github.io/rss.xml" title="RSS 订阅" target="_blank" >RSS</a>
+  </center></small></p></footer>
+</div>
+</body>
+</html>
